@@ -165,7 +165,8 @@ client.on(Events.InteractionCreate,async (intr: Interaction) => {
         }
 
         default: {
-
+            await intr.reply({ content: "failed. command does not exist.", ephemeral: DBguild.mEph});
+            return;
         }
     }
 });
