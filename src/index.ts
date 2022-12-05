@@ -12,8 +12,7 @@ client.once(Events.ClientReady, c => {
 client.on(Events.InteractionCreate,async (intr: Interaction) => {
 
     if (!intr.isChatInputCommand()) return;
-    const cmdName = intr.commandName;
-
+    
     const guild = intr.guild;
     const channel = intr.channel;
     const author = intr.user;
@@ -36,7 +35,7 @@ client.on(Events.InteractionCreate,async (intr: Interaction) => {
         });
     }
 
-    switch(cmdName) {
+    switch(intr.commandName.toLowerCase()) {
         case "ban": {
             const user = intr.options.getUser("user");
             const reason = intr.options.getString("reason") || "no resaon provided";
