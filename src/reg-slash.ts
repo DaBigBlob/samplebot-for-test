@@ -77,6 +77,17 @@ const commands = [
             .setMaxValue(100)
             .setMinValue(2)
         ),
+
+    new SlashCommandBuilder()
+        .setName("settings")
+        .setDescription("global guild-wide settings")
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false)
+        .addBooleanOption(opt => opt
+            .setName("ephemeral-response")
+            .setDescription("set whether my responses will be ephemeral")
+            .setRequired(true)
+        ),
 ].map(cmd => cmd.toJSON());
 
 

@@ -1,6 +1,8 @@
 import { ChannelType, Client, Events, GatewayIntentBits, GuildMember, Interaction, PermissionsBitField } from 'discord.js';
+import { PrismaClient } from '@prisma/client';
 import { token } from './config.json';
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildBans, GatewayIntentBits.GuildMessages] });
+const prisma = new PrismaClient();
 
 
 client.once(Events.ClientReady, c => {
@@ -12,42 +14,62 @@ client.on(Events.InteractionCreate,async (intr: Interaction) => {
     if (!intr.isChatInputCommand()) return;
     const cmdName = intr.commandName;
 
+    const guild = intr.guild;
+    const channel = intr.channel;
+    const author = intr.user;
+    if (!guild || !(channel?.type === ChannelType.GuildText) || !author) {
+        await intr.reply({ content: "failed. malformed command or permission.", ephemeral: false});
+        return;
+    }
+
+    let DBguild = await prisma.guild.findFirst({
+        where: {
+            gid: guild.id
+        }
+    });
+    if (!DBguild) {
+        DBguild = await prisma.guild.create({
+            data: {
+                gid: guild.id,
+                mEph: false
+            }
+        });
+    }
+
     switch(cmdName) {
         case "ban": {
             const user = intr.options.getUser("user");
-            const guild = intr.guild;
             const reason = intr.options.getString("reason") || "no resaon provided";
 
-            if (!user || !guild) {
-                await intr.reply({ content: "failed. malformed command or permission.", ephemeral: true});
+            if (!user) {
+                await intr.reply({ content: "failed. malformed command or permission.", ephemeral: DBguild.mEph});
                 return;
             }
 
             if (!guild.members.me?.permissions.has(PermissionsBitField.Flags.BanMembers)) {
-                await intr.reply({ content: "i need `Administrator` permission", ephemeral: true});
+                await intr.reply({ content: "i need `Administrator` permission", ephemeral: DBguild.mEph});
                 return;
             }
 
             await guild.members.ban(user, {reason: reason});
 
             await user.send("u have been banned from "+guild.name+".```\n"+reason+"\n```");
-            await intr.reply({ content: "banned that rascle 👍", ephemeral: true });
+            await intr.reply({ content: "banned that rascle 👍", ephemeral: DBguild.mEph });
             break;
         }
 
         case "soft-ban": {
             const user = intr.options.getUser("user");
-            const guild = intr.guild;
             const days = intr.options.getNumber("days");
             const reason = intr.options.getString("reason") || "no reason provided";
 
-            if (!user || !guild || !days) {
-                await intr.reply({ content: "failed. malformed command or permission.", ephemeral: true});
+            if (!user || !days) {
+                await intr.reply({ content: "failed. malformed command or permission.", ephemeral: DBguild.mEph});
                 return;
             }
 
             if (!guild.members.me?.permissions.has(PermissionsBitField.Flags.BanMembers)) {
-                await intr.reply({ content: "i need `Administrator` permission", ephemeral: true});
+                await intr.reply({ content: "i need `Administrator` permission", ephemeral: DBguild.mEph});
                 return;
             }
 
@@ -55,71 +77,90 @@ client.on(Events.InteractionCreate,async (intr: Interaction) => {
             await guild.members.unban(user);
 
             await user.send("u have been soft-banned from "+guild.name+".```\n"+reason+"\n```");
-            await intr.reply({ content: "soft-banned that rascle 👍", ephemeral: true });
+            await intr.reply({ content: "soft-banned that rascle 👍", ephemeral: DBguild.mEph });
             break;
         }
 
         case "kick": {
             const user = intr.options.getUser("user");
-            const guild = intr.guild;
 
-            if (!user || !guild) {
-                await intr.reply({ content: "failed. malformed command or permission.", ephemeral: true});
+            if (!user) {
+                await intr.reply({ content: "failed. malformed command or permission.", ephemeral: DBguild.mEph});
                 return;
             }
 
             if (!guild.members.me?.permissions.has(PermissionsBitField.Flags.KickMembers)) {
-                await intr.reply({ content: "i need `Administrator` permission", ephemeral: true});
+                await intr.reply({ content: "i need `Administrator` permission", ephemeral: DBguild.mEph});
                 return;
             }
 
             await guild.members.kick(user);
             
             await user.send("u have been kicked from.```\n"+guild.name+"\n```");
-            await intr.reply({ content: "kicked that rascle 👍", ephemeral: true });
+            await intr.reply({ content: "kicked that rascle 👍", ephemeral: DBguild.mEph });
             break;
         }
 
         case "timeout": {
             const user = intr.options.getMember("user") as GuildMember;
-            const guild = intr.guild;
             const sec = intr.options.getNumber("seconds");
 
-            if (!user || !guild || !sec) {
-                await intr.reply({ content: "failed. malformed command or permission.", ephemeral: true});
+            if (!user || !sec) {
+                await intr.reply({ content: "failed. malformed command or permission.", ephemeral: DBguild.mEph});
                 return;
             }
 
             if (!guild.members.me?.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
-                await intr.reply({ content: "i need `Administrator` permission", ephemeral: true});
+                await intr.reply({ content: "i need `Administrator` permission", ephemeral: DBguild.mEph});
                 return;
             }
 
             await user.timeout(sec*1000);
 
             await user.send("u have been timedout from "+guild.name+".");
-            await intr.reply({ content: "timedout that rascle 👍", ephemeral: true });
+            await intr.reply({ content: "timedout that rascle 👍", ephemeral: DBguild.mEph });
             break;
         }
 
         case "purge": {
-            const guild = intr.guild;
-            const channel = intr.channel
             const msgnum = intr.options.getNumber("messages");
 
-            if (!(channel?.type === ChannelType.GuildText) || !guild || !msgnum) {
-                await intr.reply({ content: "failed. malformed command or permission.", ephemeral: true});
+            if (!msgnum) {
+                await intr.reply({ content: "failed. malformed command or permission.", ephemeral: DBguild.mEph});
                 return;
             }
 
             if (!guild.members.me?.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
-                await intr.reply({ content: "i need `Administrator` permission", ephemeral: true});
+                await intr.reply({ content: "i need `Administrator` permission", ephemeral: DBguild.mEph});
                 return;
             }
 
             await channel.bulkDelete(msgnum);
 
-            await intr.reply({ content: "timedout that rascle 👍", ephemeral: true });
+            await intr.reply({ content: "timedout that rascle 👍", ephemeral: DBguild.mEph });
+            break;
+        }
+
+        case "settings": {
+            const ephBool = intr.options.getBoolean("ephemeral-response");
+
+            if (ephBool === null) {
+                await intr.reply({ content: "failed. malformed command or permission.", ephemeral: DBguild.mEph});
+                return;
+            }
+
+            if (DBguild.mEph !== ephBool) {
+                DBguild = await prisma.guild.update({
+                    where: {
+                        gid: guild.id
+                    },
+                    data: {
+                        mEph: ephBool
+                    }
+                });
+            }
+
+            await intr.reply({ content: "settings saved 👍", ephemeral: DBguild.mEph });
             break;
         }
 
